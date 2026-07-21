@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { addUserToGroup, createGroup, getGroup, listMyGroups, pendingQueue, removeUserFromGroup } from '../controllers/groupController.js';
+const router = Router();
+router.get('/', listMyGroups);
+router.post('/', createGroup);
+router.get('/:groupId', getGroup);
+router.post('/:groupId/users', addUserToGroup);
+router.delete('/:groupId/users/:userId', removeUserFromGroup);
+router.get('/:groupId/pending', pendingQueue);
+export default router;

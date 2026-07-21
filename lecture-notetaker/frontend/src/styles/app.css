@@ -1,0 +1,16 @@
+body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #f6f7fb; color: #162033; }
+header { background: #263859; padding: 1rem 2rem; }
+header a { color: white; text-decoration: none; }
+main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+.narrow { max-width: 480px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+.two-col { display: grid; grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); gap: 1rem; }
+.card { display: block; background: white; border: 1px solid #dfe5f2; border-radius: 14px; padding: 1rem; margin: 0.75rem 0; box-shadow: 0 8px 22px rgba(38, 56, 89, 0.07); color: inherit; text-decoration: none; }
+input, select, button { margin: 0.35rem; padding: 0.65rem; border-radius: 9px; border: 1px solid #c9d3e3; }
+button { background: #4361ee; color: white; cursor: pointer; border: none; }
+button:disabled { opacity: 0.6; cursor: wait; }
+.badge { background: #ffb703; color: #452b00; padding: 0.2rem 0.5rem; border-radius: 999px; }
+.chat { max-height: 420px; overflow: auto; background: #f9fbff; padding: 0.75rem; border-radius: 10px; }
+.user { text-align: right; }
+.assistant { text-align: left; }
+@media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }

@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import multer from 'multer';
+import { approveLecture, chatWithLecture, getLecture, listPersonalLectures, submitLecture, uploadLecture } from '../controllers/lectureController.js';
+const upload = multer({ dest: process.env.UPLOAD_DIR || 'uploads' });
+const router = Router();
+router.get('/personal', listPersonalLectures);
+router.post('/', upload.single('audio'), uploadLecture);
+router.get('/:lectureId', getLecture);
+router.post('/:lectureId/submit', submitLecture);
+router.post('/:lectureId/approve', approveLecture);
+router.post('/:lectureId/chat', chatWithLecture);
+export default router;
