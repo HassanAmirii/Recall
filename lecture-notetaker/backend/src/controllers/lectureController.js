@@ -56,7 +56,10 @@ export async function uploadLecture(req, res, next) {
     });
 
     // 1. Split audio into chunks
-    console.log(`Splitting audio for lecture ${lecture._id}...`);
+    console.log(`🎧 Splitting audio for lecture ${lecture._id}...`);
+    lecture.processingStatus = "processing";
+    lecture.errorMessage = "";
+    await lecture.save();
     lecture.audioChunks = await splitAudioIntoChunks(
       req.file.path,
       lecture._id,
@@ -64,25 +67,25 @@ export async function uploadLecture(req, res, next) {
     lecture.processingStatus = "chunking_completed";
     await lecture.save();
     console.log(
-      `Created ${lecture.audioChunks.length} chunks for lecture ${lecture._id}`,
+      `✅ Created ${lecture.audioChunks.length} chunks for lecture ${lecture._id}`,
     );
 
     // 2. Process audio (transcribe and generate notes)
     // This could take time, so we'll do it with progress tracking
-    console.log(`Processing audio for lecture ${lecture._id}...`);
+    console.log(`📝 Processing audio for lecture ${lecture._id}...`);
     await processLectureAudio(lecture, {
       batchSize: 3,
       onProgress: (progress) => {
         console.log(
-          `Lecture ${lecture._id} processing: ${progress.current}/${progress.total}`,
+          `📈 Lecture ${lecture._id} processing: ${progress.current}/${progress.total} (${progress.percent}%)`,
         );
       },
     });
 
-    console.log(`Lecture ${lecture._id} fully processed successfully`);
+    console.log(`✅ Lecture ${lecture._id} fully processed successfully`);
     res.status(201).json(lecture);
   } catch (e) {
-    console.error("Upload lecture error:", e);
+    console.error("❌ Upload lecture error:", e);
     next(e);
   }
 }
@@ -130,20 +133,22 @@ export async function uploadLectureAsync(req, res, next) {
     });
 
     // Process in background
-    processLectureInBackground(lecture._id, req.file.path).catch(console.error);
+    processLectureInBackground(lecture._id, req.file.path).catch((error) => {
+      console.error(`❌ Unhandled background processing error for ${lecture._id}:`, error);
+    });
   } catch (e) {
-    console.error("Upload lecture error:", e);
+    console.error("❌ Upload lecture error:", e);
     next(e);
   }
 }
 
 // Background processing function for async upload
-async function processLectureInBackground(lectureId, filePath) {
+export async function processLectureInBackground(lectureId, filePath) {
   try {
     const lecture = await Lecture.findById(lectureId);
     if (!lecture) throw new Error("Lecture not found");
 
-    console.log(`Background processing started for lecture ${lectureId}`);
+    console.log(`🚀 Background processing started for lecture ${lectureId}`);
     lecture.processingStatus = "processing";
     await lecture.save();
 
@@ -157,20 +162,21 @@ async function processLectureInBackground(lectureId, filePath) {
       batchSize: 3,
       onProgress: (progress) => {
         console.log(
-          `Background progress for ${lectureId}: ${progress.current}/${progress.total}`,
+          `📈 Background progress for ${lectureId}: ${progress.current}/${progress.total} (${progress.percent}%)`,
         );
       },
     });
 
-    console.log(`Background processing completed for lecture ${lectureId}`);
+    console.log(`✅ Background processing completed for lecture ${lectureId}`);
   } catch (error) {
     console.error(
-      `Background processing failed for lecture ${lectureId}:`,
+      `❌ Background processing failed for lecture ${lectureId}:`,
       error,
     );
     await Lecture.findByIdAndUpdate(lectureId, {
       processingStatus: "failed",
       errorMessage: error.message,
+      processedAt: new Date(),
     });
   }
 }
@@ -249,7 +255,7 @@ export async function approveLecture(req, res, next) {
 export async function getLectureStatus(req, res, next) {
   try {
     const lecture = await Lecture.findById(req.params.lectureId).select(
-      "processingStatus rawTranscript structuredNotes errorMessage",
+      "processingStatus rawTranscript structuredNotes errorMessage processedAt audioChunks uploadedBy groupId status",
     );
 
     if (!lecture) throw httpError(404, "Lecture not found");
@@ -261,6 +267,8 @@ export async function getLectureStatus(req, res, next) {
       hasTranscript: !!lecture.rawTranscript,
       hasNotes: !!lecture.structuredNotes,
       error: lecture.errorMessage,
+      processedAt: lecture.processedAt,
+      chunkCount: lecture.audioChunks?.length || 0,
     });
   } catch (e) {
     next(e);
@@ -271,7 +279,7 @@ export async function getLectureStatus(req, res, next) {
 export async function getLectureNotes(req, res, next) {
   try {
     const lecture = await Lecture.findById(req.params.lectureId).select(
-      "title structuredNotes rawTranscript",
+      "title structuredNotes rawTranscript processingStatus errorMessage uploadedBy groupId status",
     );
 
     if (!lecture) throw httpError(404, "Lecture not found");

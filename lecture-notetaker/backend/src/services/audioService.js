@@ -7,10 +7,12 @@ import { transcribeChunk, cleanAndStructureNotes } from "./gemmaService.js";
 const CHUNK_SECONDS = 30;
 
 // Set ffmpeg path to the bundled binary
-ffmpeg.setFfmpegPath(ffmpegStatic);
-
-// Log ffmpeg path for debugging
-console.log(`FFmpeg path: ${ffmpegStatic}`);
+if (ffmpegStatic) {
+  ffmpeg.setFfmpegPath(ffmpegStatic);
+  console.log(`✅ ffmpeg-static binary configured: ${ffmpegStatic}`);
+} else {
+  console.error("❌ ffmpeg-static did not resolve a binary path. Run npm install in backend.");
+}
 
 /**
  * Split an audio file into smaller chunks for processing
@@ -89,8 +91,8 @@ export async function splitAudioIntoChunks(inputPath, lectureId) {
       fileName: file,
     }));
   } catch (error) {
-    console.error("ffmpeg chunking failed:", error.message);
-    console.error("Error stack:", error.stack);
+    console.error("❌ ffmpeg chunking failed:", error.message);
+    console.error("🧵 Error stack:", error.stack);
     console.warn("⚠️ Using original upload as a single placeholder chunk.");
 
     // Check if original file exists
@@ -165,6 +167,7 @@ export async function processLectureAudio(lecture, options = {}) {
           onProgress({
             current: i + index + 1,
             total: chunks.length,
+            percent: Math.round(((i + index + 1) / chunks.length) * 100),
             chunkIndex: chunk.chunkIndex,
             transcript: transcript,
           });
@@ -233,8 +236,13 @@ export async function processLectureAudio(lecture, options = {}) {
  */
 export async function verifyFFmpeg() {
   try {
-    console.log("Verifying ffmpeg installation...");
-    console.log(`FFmpeg path: ${ffmpegStatic}`);
+    console.log("🔎 Verifying ffmpeg installation...");
+    console.log(`🎬 FFmpeg path: ${ffmpegStatic || "not resolved"}`);
+
+    if (!ffmpegStatic) {
+      console.error("❌ ffmpeg-static did not provide a binary path");
+      return false;
+    }
 
     // Check if ffmpeg exists at the path
     try {
