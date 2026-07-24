@@ -19,15 +19,14 @@ npm run dev
 
 The frontend runs at `http://localhost:5173` and the API runs at `http://localhost:5000` by default.
 
-## Current placeholder AI behavior
+## Gemma parser integration
 
-The backend has placeholder implementations for:
+The backend uses the Google Generative Language API as the Gemma parser for transcription, note structuring, and lecture chat. Configure these environment variables in `backend/.env`:
 
-- `transcribeChunk(chunkPath)`
-- `cleanAndStructureNotes(fullTranscript)`
-- `answerQuestion(structuredNotes, question, chatHistory)`
+- `GEMMA_API_KEY` or `GOOGLE_API_KEY`: API key for the model endpoint.
+- `GEMMA_MODEL`: optional model override; defaults to `gemma-3-27b-it`.
 
-Each placeholder has a `// TODO: replace with real Gemma 4 API call` comment and returns dummy data so the upload, chunking, notes, submission, approval, and chat flows can be tested end-to-end.
+Uploads now include an optional parser context field. Add course/topic details, local terminology, lecturer accent notes, SDG framing, or extraction goals so Gemma can resolve ambiguous audio and produce more useful structured notes.
 
 ## Core flows
 

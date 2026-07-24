@@ -8,6 +8,7 @@ const audioChunkSchema = new mongoose.Schema({
 const lectureSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   courseTag: { type: String, trim: true, default: '' },
+  lectureContext: { type: String, trim: true, default: '' },
   uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', default: null },
   status: { type: String, enum: ['personal', 'pending', 'approved'], required: true },

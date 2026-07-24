@@ -32,10 +32,10 @@ export async function splitAudioIntoChunks(inputPath, lectureId) {
 export async function processLectureAudio(lecture) {
   const transcripts = [];
   for (const chunk of lecture.audioChunks.sort((a, b) => a.chunkIndex - b.chunkIndex)) {
-    transcripts.push(await transcribeChunk(chunk.filePath));
+    transcripts.push(await transcribeChunk(chunk.filePath, lecture.lectureContext));
   }
   const rawTranscript = transcripts.join('\n\n');
-  const structuredNotes = await cleanAndStructureNotes(rawTranscript);
+  const structuredNotes = await cleanAndStructureNotes(rawTranscript, lecture.lectureContext);
   lecture.rawTranscript = rawTranscript;
   lecture.structuredNotes = structuredNotes;
   await lecture.save();
