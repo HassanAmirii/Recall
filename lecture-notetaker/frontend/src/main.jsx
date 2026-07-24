@@ -1,44 +1,54 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Link, Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Home from './pages/Home';
+import LandingPage from './pages/LandingPage';
 import GroupPage from './pages/GroupPage';
 import LecturePage from './pages/LecturePage';
 import AuthPage from './pages/AuthPage';
 import UploadLecture from './components/UploadLecture';
+import { clearToken, getToken } from './api/client';
 import './styles/app.css';
 
 function Icon({ name }) {
   const paths = {
     groups: 'M4 7.5A3.5 3.5 0 0 1 7.5 4h9A3.5 3.5 0 0 1 20 7.5v9a3.5 3.5 0 0 1-3.5 3.5h-9A3.5 3.5 0 0 1 4 16.5v-9Zm4 1.5h8M8 13h5',
     vault: 'M6 9V7a6 6 0 1 1 12 0v2M5 9h14v11H5V9Zm7 4v3',
-    settings: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm0-5v2m0 13v2m8.5-8.5h-2m-13 0h-2m14.5-6.5-1.4 1.4M6.9 17.1l-1.4 1.4m13 0-1.4-1.4M6.9 6.9 5.5 5.5',
     plus: 'M12 5v14m-7-7h14',
-    moon: 'M20 14.2A7.4 7.4 0 0 1 9.8 4a8 8 0 1 0 10.2 10.2Z',
   };
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d={paths[name]} /></svg>;
 }
 
+function RequireAuth({ children }) {
+  return getToken() ? children : <Navigate to="/login" replace />;
+}
+
 function Shell({ children }) {
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [theme, setTheme] = useState('light');
   const location = useLocation();
-  if (location.pathname === '/auth') return <div className={`theme-${theme}`}>{children}</div>;
+  const navigate = useNavigate();
+  const isPublic = location.pathname === '/' || location.pathname === '/login';
+
+  if (isPublic) return <div className="theme-light public-shell">{children}</div>;
+
+  function logout() {
+    clearToken();
+    navigate('/');
+  }
+
   return (
-    <div className={`app-shell theme-${theme}`}>
-      <div className="ambient ambient-one" /><div className="ambient ambient-two" /><div className="ambient ambient-three" />
+    <div className="app-shell theme-light">
       <header className="topbar">
-        <Link to="/" className="brand" aria-label="Recall home">
+        <Link to="/home" className="brand" aria-label="Recall home">
           <span className="brand-mark">R</span><span className="brand-copy">Recall<span>AI study companion</span></span>
         </Link>
         <nav className="side-nav" aria-label="Primary navigation">
-          <Link to="/"><Icon name="groups" />Courses</Link>
-          <Link to="/"><Icon name="vault" />Vault</Link>
-          <a href="#settings"><Icon name="settings" />Settings</a>
+          <Link to="/home"><Icon name="groups" />My Groups</Link>
+          <Link to="/home"><Icon name="vault" />Personal</Link>
         </nav>
         <div className="top-actions">
-          <button className="theme-toggle secondary" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label="Toggle light and dark mode"><Icon name="moon" />{theme === 'light' ? 'Dark' : 'Light'}</button>
-          <button className="new-recording cta-glow" onClick={() => setUploadOpen(true)}><Icon name="plus" />New Recording</button>
+          <button className="secondary" onClick={logout}>Logout</button>
+          <button className="new-recording" onClick={() => setUploadOpen(true)}><Icon name="plus" />New Recording</button>
         </div>
       </header>
       <div className="content-frame">{children}</div>
@@ -49,11 +59,13 @@ function Shell({ children }) {
 
 function App() {
   return <BrowserRouter><Shell><Routes>
-    <Route path="/auth" element={<AuthPage />} />
-    <Route path="/" element={<Home />} />
-    <Route path="/groups/:groupId" element={<GroupPage />} />
-    <Route path="/lectures/:lectureId" element={<LecturePage />} />
-    <Route path="*" element={<Navigate to="/" />} />
+    <Route path="/" element={<LandingPage />} />
+    <Route path="/login" element={<AuthPage />} />
+    <Route path="/auth" element={<Navigate to="/login" replace />} />
+    <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
+    <Route path="/groups/:groupId" element={<RequireAuth><GroupPage /></RequireAuth>} />
+    <Route path="/lectures/:lectureId" element={<RequireAuth><LecturePage /></RequireAuth>} />
+    <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></Shell></BrowserRouter>;
 }
 
