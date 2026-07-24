@@ -1,3 +1,4 @@
+import "../config/env.js";
 import { createReadStream } from "fs";
 import fs from "fs/promises";
 import path from "path";
@@ -20,6 +21,10 @@ const mimeTypes = new Map([
   [".webm", "audio/webm"],
 ]);
 
+function isConfiguredSecret(value) {
+  return Boolean(value && !value.toLowerCase().startsWith("your_") && !value.toLowerCase().includes("_here"));
+}
+
 function getConfig() {
   const requestedModel = process.env.GEMMA_MODEL || process.env.GROQ_GEMMA_MODEL || DEFAULT_MODEL;
   const model = GEMMA_MODELS.includes(requestedModel) ? requestedModel : DEFAULT_MODEL;
@@ -28,11 +33,14 @@ function getConfig() {
     console.warn(`⚠️ Unsupported Gemma model "${requestedModel}" requested. Using ${DEFAULT_MODEL}.`);
   }
 
+  const groqApiKey = process.env.GROQ_API_KEY || "";
+  const togetherApiKey = process.env.TOGETHER_API_KEY || "";
+
   return {
-    groqApiKey: process.env.GROQ_API_KEY || "",
+    groqApiKey: isConfiguredSecret(groqApiKey) ? groqApiKey : "",
     model,
-    fallbackEnabled: process.env.TOGETHER_FALLBACK_ENABLED !== "false",
-    togetherApiKey: process.env.TOGETHER_API_KEY || "",
+    togetherApiKey: isConfiguredSecret(togetherApiKey) ? togetherApiKey : "",
+    fallbackEnabled: process.env.TOGETHER_FALLBACK_ENABLED === "true" && isConfiguredSecret(togetherApiKey),
     togetherModel: process.env.TOGETHER_GEMMA_MODEL || DEFAULT_FALLBACK_MODEL,
     transcriptionModel: process.env.GROQ_TRANSCRIPTION_MODEL || DEFAULT_TRANSCRIPTION_MODEL,
   };
@@ -46,16 +54,24 @@ function createGroqClient() {
   return new Groq({ apiKey: groqApiKey });
 }
 
+function maskKeyStatus(key) {
+  if (!key) {
+    return "missing";
+  }
+  return `${key.slice(0, 4)}…${key.slice(-4)} (${key.length} chars)`;
+}
+
 function logGemmaBanner() {
-  const { model, fallbackEnabled, togetherModel, transcriptionModel } = getConfig();
+  const { groqApiKey, model, fallbackEnabled, togetherApiKey, togetherModel, transcriptionModel } = getConfig();
   console.log("\n🦙 Gemma Integration via Groq Cloud");
   console.log("📋 SDG 4: Quality Education");
+  console.log(`🔑 Groq API key: ${maskKeyStatus(groqApiKey)}`);
   console.log(`🤖 Model being used: ${model}`);
   console.log(`🎧 Cloud speech-to-text: ${transcriptionModel}`);
   console.log(
     fallbackEnabled
       ? `🛟 Fallback: Together AI (${togetherModel})`
-      : "🛟 Fallback: disabled",
+      : `🛟 Fallback: disabled${togetherApiKey ? "" : " (TOGETHER_API_KEY is not set)"}`,
   );
   console.log("☁️ Cloud processing enabled for 8GB RAM laptops.\n");
 }
@@ -141,6 +157,10 @@ async function callGemma(messages, options = {}) {
     return await callGroqGemma(messages, options);
   } catch (groqError) {
     console.error(`❌ Groq Gemma error: ${groqError.message}`);
+    const { fallbackEnabled } = getConfig();
+    if (!fallbackEnabled) {
+      throw new Error(`Gemma cloud request failed. Groq: ${groqError.message}. Together fallback is disabled or TOGETHER_API_KEY is not set.`);
+    }
     try {
       return await callTogetherGemma(messages, options);
     } catch (fallbackError) {
@@ -153,13 +173,14 @@ async function callGemma(messages, options = {}) {
 }
 
 export function listGemmaModels() {
-  const { model, togetherModel, fallbackEnabled } = getConfig();
+  const { groqApiKey, model, togetherModel, fallbackEnabled } = getConfig();
   return {
     provider: "Groq Cloud",
     sdgTheme: "SDG 4: Quality Education",
     defaultModel: DEFAULT_MODEL,
     activeModel: model,
     groqModels: GEMMA_MODELS,
+    groqApiKey: maskKeyStatus(groqApiKey),
     fallback: fallbackEnabled
       ? { provider: "Together AI", model: togetherModel }
       : { provider: "Together AI", enabled: false },

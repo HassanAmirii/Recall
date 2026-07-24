@@ -21,10 +21,14 @@ The frontend runs at `http://localhost:5173` and the API runs at `http://localho
 
 ## Gemma parser integration
 
-The backend uses the Google Generative Language API as the Gemma parser for transcription, note structuring, and lecture chat. Configure these environment variables in `backend/.env`:
+The backend uses real Gemma models through Groq Cloud for transcript cleanup, note structuring, and lecture chat. Configure these environment variables in `backend/.env`:
 
-- `GEMMA_API_KEY` or `GOOGLE_API_KEY`: API key for the model endpoint.
-- `GEMMA_MODEL`: optional model override; defaults to `gemma-3-27b-it`.
+- `GROQ_API_KEY`: required Groq API key from the Groq console. If Groq returns `401 invalid_api_key`, create a fresh key, replace this value, and restart the backend.
+- `GEMMA_MODEL`: optional model override; defaults to `gemma2-9b-it`. Supported values are `gemma2-9b-it` and `gemma2-27b-it`.
+- `TOGETHER_FALLBACK_ENABLED`: set to `true` only when you also provide a valid `TOGETHER_API_KEY`; otherwise the fallback stays disabled to avoid repeated missing-key errors.
+- `TOGETHER_API_KEY`: optional Together AI fallback key.
+
+`backend/.env` is loaded automatically whether you start the backend from the repo root or from the `backend` directory.
 
 Uploads now include an optional parser context field. Add course/topic details, local terminology, lecturer accent notes, SDG framing, or extraction goals so Gemma can resolve ambiguous audio and produce more useful structured notes.
 
