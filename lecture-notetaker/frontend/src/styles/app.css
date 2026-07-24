@@ -9,7 +9,7 @@ h1{font-size:var(--title-size);line-height:1.05;font-weight:var(--title-weight);
 h2{font-size:var(--section-size);line-height:1.2;font-weight:var(--section-weight);letter-spacing:-.035em;color:var(--text)}
 h3{font-size:1.125rem;line-height:1.25;font-weight:var(--section-weight);letter-spacing:-.02em;color:var(--text)}
 p{font-size:var(--body-size);font-weight:var(--body-weight)}
-button,input,select{font:inherit}
+button,input,select,textarea{font:inherit}
 .app-shell,.theme-light,.theme-dark{min-height:100vh;background:radial-gradient(circle at 12% 8%,rgba(249,115,22,.18),transparent 28%),radial-gradient(circle at 82% 4%,rgba(8,145,178,.2),transparent 30%),radial-gradient(circle at 74% 82%,rgba(16,185,129,.16),transparent 26%),linear-gradient(135deg,var(--bg),var(--bg2));color:var(--text);transition:background .35s ease,color .35s ease}
 .app-shell{position:relative;overflow:hidden}
 .ambient{position:fixed;z-index:0;filter:blur(34px);opacity:.5;border-radius:999px;pointer-events:none;animation:breathe 7s ease-in-out infinite}
@@ -34,8 +34,8 @@ svg{width:1.05rem;height:1.05rem;fill:none;stroke:currentColor;stroke-width:1.8;
 button:hover,.button-like:hover,.course-row:hover,.draft-row:hover,.queue-row:hover,.workflow-card:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(15,23,42,.12)}
 button:active{transform:scale(.98)}
 button:disabled{opacity:.55;cursor:not-allowed}
-input,select{width:100%;border:1px solid var(--border);border-radius:var(--action-radius);background:var(--surface-strong);color:var(--text);padding:.875rem 1rem;outline:0;transition:all .2s ease}
-input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid rgba(8,145,178,.25);outline-offset:2px}
+input,select,textarea{width:100%;border:1px solid var(--border);border-radius:var(--action-radius);background:var(--surface-strong);color:var(--text);padding:.875rem 1rem;outline:0;transition:all .2s ease}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid rgba(8,145,178,.25);outline-offset:2px}
 .content-frame{position:relative;z-index:1}
 .page-stack{width:min(1180px,calc(100% - 2rem));margin:0 auto;padding:var(--space-4) 0 4rem;display:grid;gap:var(--space-3)}
 .hero-panel,.panel-card,.tabs-shell,.notes-doc,.ai-panel,.upload-card,.workflow-card,.testimonial-card,.faq-card,.demo-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:blur(22px);box-shadow:var(--shadow)}
@@ -95,6 +95,8 @@ input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{ou
 .doc-meta{display:flex;gap:var(--space-1);margin:1rem 0 2rem;text-transform:uppercase;letter-spacing:.12em;font-size:.72rem}
 .note-block{padding:var(--space-2) 0;border-top:1px solid var(--border)}
 .note-block li{margin:.5rem 0;color:var(--muted);line-height:1.7}
+.context-note{margin:1rem 0;padding:var(--space-2);border:1px solid var(--border);border-radius:1rem;background:var(--panel)}
+.context-note p{margin:.35rem 0 0;color:var(--muted);line-height:1.6;white-space:pre-wrap}
 .note-block blockquote{margin:1rem 0 0;padding:var(--space-2);border-left:2px solid var(--cyan);border-radius:1rem;background:var(--panel);display:grid;gap:var(--space-1)}
 .ai-panel{height:calc(100vh - 4rem);position:sticky;top:2rem;display:flex;flex-direction:column;padding:1rem}
 .chat-thread{min-height:0;flex:1;overflow:auto;display:grid;align-content:start;gap:var(--space-1);padding-right:.3rem}

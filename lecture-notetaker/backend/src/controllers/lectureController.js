@@ -14,14 +14,14 @@ async function canView(userId, lecture) {
 
 export async function uploadLecture(req, res, next) { try {
   if (!req.file) throw httpError(400, 'Audio file is required');
-  const { title, courseTag, groupId } = req.body;
+  const { title, courseTag, groupId, lectureContext } = req.body;
   let status = 'personal'; let approvedAt = null; let approvedBy = null;
   if (groupId) {
     const membership = await getMembership(req.user._id, groupId);
     if (!membership || membership.role !== 'admin') throw httpError(403, 'Only group admins can directly upload approved group lectures');
     status = 'approved'; approvedAt = new Date(); approvedBy = req.user._id;
   }
-  const lecture = await Lecture.create({ title, courseTag, uploadedBy: req.user._id, groupId: groupId || null, status, approvedAt, approvedBy, audioChunks: [] });
+  const lecture = await Lecture.create({ title, courseTag, uploadedBy: req.user._id, groupId: groupId || null, status, approvedAt, approvedBy, lectureContext, audioChunks: [] });
   lecture.audioChunks = await splitAudioIntoChunks(req.file.path, lecture._id);
   await lecture.save();
   await processLectureAudio(lecture);

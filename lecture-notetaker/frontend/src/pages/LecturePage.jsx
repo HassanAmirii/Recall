@@ -18,6 +18,9 @@ export default function LecturePage() {
         <p className="eyebrow">Structured Notes</p>
         <h1 className="truncate">{data.lecture.title}</h1>
         <div className="doc-meta"><span>{data.lecture.courseTag || "UNTAGGED"}</span><span>{data.lecture.createdAt && new Date(data.lecture.createdAt).toLocaleString()}</span></div>
+        {data.lecture.lectureContext && <div className="context-note"><strong>Parser context</strong><p>{data.lecture.lectureContext}</p></div>}
+        {data.lecture.structuredNotes?.summary && <div className="context-note"><strong>Gemma summary</strong><p>{data.lecture.structuredNotes.summary}</p></div>}
+        {data.lecture.structuredNotes?.actionItems?.length > 0 && <article className="note-block"><h2>Study actions</h2><ul>{data.lecture.structuredNotes.actionItems.map((item, i) => <li key={i}>{item}</li>)}</ul></article>}
         {notes.map((h, i) => (
           <article className="note-block" key={i}>
             <h2>{h.title}</h2>
