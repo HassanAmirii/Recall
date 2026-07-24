@@ -6,8 +6,16 @@ export function getToken() {
 export function setToken(token) {
   localStorage.setItem("lecture-token", token);
 }
+export function getUser() {
+  const raw = localStorage.getItem("lecture-user");
+  return raw ? JSON.parse(raw) : null;
+}
+export function setUser(user) {
+  localStorage.setItem("lecture-user", JSON.stringify(user));
+}
 export function clearToken() {
   localStorage.removeItem("lecture-token");
+  localStorage.removeItem("lecture-user");
 }
 
 export async function api(path, options = {}) {
