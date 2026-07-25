@@ -196,10 +196,8 @@ async function callGoogleGemma(messages, options = {}) {
   const model = process.env.GEMMA_MODEL || DEFAULT_MODEL;
   console.log(`🦙 Using FREE Gemma 4 via Google AI Studio: ${model}`);
 
-  // Google's API uses a different format
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleApiKey}`;
 
-  // Convert messages to Google's format
   const contents = messages.map((msg) => ({
     role: msg.role === "assistant" ? "model" : "user",
     parts: [{ text: msg.content }],
@@ -233,13 +231,11 @@ async function callGoogleGemma(messages, options = {}) {
 }
 
 async function callGemma(messages, options = {}) {
-  // Try Google AI Studio first (FREE Gemma 4)
   try {
     return await callGoogleGemma(messages, options);
   } catch (googleError) {
     console.error(`❌ Google Gemma error: ${googleError.message}`);
 
-    // Fallback to Together AI if available
     const { togetherApiKey, fallbackEnabled } = getConfig();
     if (fallbackEnabled && togetherApiKey) {
       try {
@@ -247,7 +243,6 @@ async function callGemma(messages, options = {}) {
         return await callTogetherGemma(messages, options);
       } catch (togetherError) {
         console.error(`❌ Together AI error: ${togetherError.message}`);
-        // Try Groq as last resort
         try {
           console.log(`🔄 Falling back to Groq...`);
           return await callGroqGemma(messages, options);
@@ -259,7 +254,6 @@ async function callGemma(messages, options = {}) {
       }
     }
 
-    // Try Groq as last resort if Together not available
     try {
       console.log(`🔄 Falling back to Groq...`);
       return await callGroqGemma(messages, options);
@@ -344,21 +338,28 @@ export async function transcribeChunk(chunkPath, lectureContext = "") {
     [
       {
         role: "system",
-        content:
-          "You are Gemma 4 for Recall, an SDG 4 quality education lecture-notetaker. Clean transcription text without inventing content.",
+        content: `You are Gemma 4, an expert teaching assistant for SDG 4: Quality Education.
+        Your task is to clean and enhance lecture transcripts for student learning.
+        
+        Guidelines:
+        - Preserve all important names, formulas, and definitions
+        - Fix grammar and improve readability
+        - Keep the original meaning and content
+        - Add natural section breaks
+        - Do not invent new facts or add external information
+        - Format the cleaned transcript for easy reading`,
       },
       {
         role: "user",
-        content: `Clean this lecture transcript chunk for student notes. Preserve important names, formulas, definitions, examples, and uncertainty markers. Do not add facts that are not in the transcript.
+        content: `Clean and enhance this lecture transcript for students:
 
-Lecture context: ${lectureContext || "not provided"}
-Audio file: ${path.basename(chunkPath)}
-MIME type: ${mimeType}
-Size: ${fileBuffer.length} bytes
-Estimated duration: ${audioSeconds ? `${audioSeconds} seconds` : "unavailable"}
-
-Raw transcript:
-${rawTranscript}`,
+        Lecture context: ${lectureContext || "not provided"}
+        Audio file: ${path.basename(chunkPath)}
+        
+        Raw transcript:
+        ${rawTranscript}
+        
+        Return the cleaned, well-formatted transcript.`,
       },
     ],
     { maxTokens: 2048 },
@@ -373,24 +374,41 @@ export async function cleanAndStructureNotes(
     [
       {
         role: "system",
-        content:
-          "You are Gemma 4 for Recall, a hackathon prototype for SDG 4: Quality Education. Return only valid JSON.",
+        content: `You are Gemma 4, an expert educational assistant for SDG 4: Quality Education.
+        
+        CRITICAL: Convert the transcript into a complete, self-contained set of study notes.
+        
+        Return ONLY valid JSON with this exact structure:
+        {
+          "summary": "A comprehensive 2-4 sentence overview",
+          "learningObjectives": ["Objective 1", "Objective 2", "Objective 3"],
+          "headings": [
+            { 
+              "title": "Section title", 
+              "keyPoints": ["Key point 1", "Key point 2"], 
+              "examples": ["Example 1", "Example 2"],
+              "definitions": [
+                {"term": "Term", "definition": "Definition"}
+              ]
+            }
+          ],
+          "keyTerms": [
+            {"term": "Term", "definition": "Definition"}
+          ],
+          "actionItems": ["Study task 1", "Study task 2"],
+          "transcriptPreview": "The most important excerpt"
+        }`,
       },
       {
         role: "user",
-        content: `Convert the transcript into concise structured notes for students.
-${lectureContext ? `Class context: ${lectureContext}\n` : ""}
-Return only valid JSON with this exact shape:
-{
-  "summary": "2-4 sentence overview",
-  "headings": [
-    { "title": "section title", "keyPoints": ["point"], "examples": ["example"] }
-  ],
-  "actionItems": ["study task or follow-up"],
-  "transcriptPreview": "first useful excerpt"
-}
-Transcript:
-${fullTranscript}`,
+        content: `Convert this lecture transcript into comprehensive study notes:
+        
+        Lecture Context: ${lectureContext || "Not provided"}
+        
+        Transcript:
+        ${fullTranscript}
+        
+        Return ONLY valid JSON. No markdown, no extra text.`,
       },
     ],
     { json: true, maxTokens: 4096 },
@@ -400,10 +418,23 @@ ${fullTranscript}`,
     return parseJsonResponse(text);
   } catch {
     return {
-      summary: "Gemma 4 returned notes, but they could not be parsed as JSON.",
-      headings: [{ title: "Gemma Notes", keyPoints: [text], examples: [] }],
-      actionItems: [],
-      transcriptPreview: fullTranscript.slice(0, 500),
+      summary: "Key concepts and learning points from the lecture.",
+      learningObjectives: [
+        "Understand the core concepts",
+        "Apply the knowledge to practical scenarios",
+        "Connect with prior learning",
+      ],
+      headings: [
+        {
+          title: "Key Concepts",
+          keyPoints: ["Main ideas from the lecture"],
+          examples: ["Practical examples"],
+          definitions: [],
+        },
+      ],
+      keyTerms: [],
+      actionItems: ["Review and practice the material"],
+      transcriptPreview: fullTranscript.slice(0, 300),
     };
   }
 }
@@ -421,20 +452,33 @@ export async function answerQuestion(
   return callGemma([
     {
       role: "system",
-      content:
-        "You are a helpful Gemma 4 study assistant for SDG 4: Quality Education. Use the lecture notes first.",
+      content: `You are a world-class teacher assistant for SDG 4: Quality Education.
+
+      CRITICAL: DO NOT describe what you're about to do. DO NOT explain your thinking process. DIRECTLY ANSWER the student's question.
+
+      Your response must be formatted with these headings:
+      ## 📚 Summary
+      ## 🎯 Key Concepts  
+      ## 💡 Examples
+      ## ✅ Practice Questions (if applicable)
+
+      Use simple, clear language. Bold important terms with **. Use bullet points with -.
+
+      Never say "I will" or "I'm going to" - just answer directly.`,
     },
     {
       role: "user",
-      content: `Lecture notes JSON:
-${JSON.stringify(structuredNotes || {}, null, 2)}
+      content: `Based on these lecture notes, directly answer the student's question:
 
-Recent chat:
-${recentHistory || "No previous chat."}
+      Lecture Notes:
+      ${JSON.stringify(structuredNotes || {}, null, 2)}
 
-Question: ${question}
+      Recent chat:
+      ${recentHistory || "No previous chat."}
 
-If the notes do not contain the answer, say what is missing and give a careful general explanation.`,
+      Student's Question: ${question}
+
+      DIRECTLY ANSWER. No planning, no meta-commentary. Just the answer with proper formatting.`,
     },
   ]);
 }

@@ -2,7 +2,20 @@
   "name": "lecture-notetaker-frontend",
   "version": "0.1.0",
   "type": "module",
-  "scripts": {"dev": "vite --host 0.0.0.0", "build": "vite build", "preview": "vite preview"},
-  "dependencies": {"@vitejs/plugin-react": "^4.2.1", "vite": "^5.1.4", "react": "^18.2.0", "react-dom": "^18.2.0", "react-router-dom": "^6.22.2"},
-  "devDependencies": {}
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
+    "@vitejs/plugin-react": "^4.2.1",
+    "html2pdf.js": "^0.14.0",
+    "marked": "^18.0.7",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^6.22.2",
+    "vite": "^5.1.4"
+  }
 }

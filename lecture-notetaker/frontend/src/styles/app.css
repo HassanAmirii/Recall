@@ -967,7 +967,124 @@ summary {
   line-height: 1.5;
   font-size: 0.9rem;
 }
+/* Markdown styles for assistant messages */
+.chat-thread .message.assistant h1,
+.chat-thread .message.assistant h2,
+.chat-thread .message.assistant h3,
+.chat-thread .message.assistant h4 {
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
 
+.chat-thread .message.assistant h2 {
+  font-size: 1rem;
+  color: #2563eb;
+}
+
+.chat-thread .message.assistant h3 {
+  font-size: 0.95rem;
+  color: #1e293b;
+}
+
+.chat-thread .message.assistant ul,
+.chat-thread .message.assistant ol {
+  padding-left: 1.5rem;
+  margin: 0.25rem 0;
+}
+
+.chat-thread .message.assistant li {
+  margin-bottom: 0.15rem;
+  list-style-type: disc;
+}
+
+.chat-thread .message.assistant strong {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.chat-thread .message.assistant code {
+  background: #f1f5f9;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-family: "Courier New", monospace;
+  font-size: 0.85rem;
+}
+
+.chat-thread .message.assistant p {
+  margin: 0.25rem 0;
+  line-height: 1.5;
+}
+
+.chat-thread .message.assistant {
+  background: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.chat-thread .message.user {
+  background: #dbeafe;
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.chat-thread .message {
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.chat-thread .message span {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #64748b;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+/* PDF Button Styling */
+.download-pdf-btn {
+  padding: 8px 16px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.download-pdf-btn:hover {
+  background: #1d4ed8;
+}
+
+.download-pdf-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Definition styling */
+.definition-list {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+
+.definition-item {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.definition-item strong {
+  color: #1e293b;
+  min-width: 80px;
+}
 @media (max-width: 800px) {
   .landing-hero,
   .auth-page {
