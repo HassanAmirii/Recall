@@ -203,21 +203,27 @@ async function callGoogleGemma(messages, options = {}) {
     parts: [{ text: msg.content }],
   }));
 
+  const requestBody = {
+    contents: contents,
+    generationConfig: {
+      temperature: options.temperature ?? 0.2,
+      maxOutputTokens: options.maxTokens ?? 4096,
+    },
+  };
+
+  if (options.json) {
+    requestBody.generationConfig.responseMimeType = "application/json";
+  }
+
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: contents,
-      generationConfig: {
-        temperature: options.temperature ?? 0.2,
-        maxOutputTokens: options.maxTokens ?? 4096,
-        ...(options.json ? { responseMimeType: "application/json" } : {}),
-      },
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   const data = await response.json();
   if (!response.ok) {
+    console.error(`❌ Google API error:`, JSON.stringify(data, null, 2));
     throw new Error(
       data.error?.message || `Google API error: ${response.status}`,
     );
@@ -225,8 +231,29 @@ async function callGoogleGemma(messages, options = {}) {
 
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
   if (!text) {
+    console.error(
+      `❌ Empty response from Google:`,
+      JSON.stringify(data, null, 2),
+    );
     throw new Error("Google Gemma returned an empty response.");
   }
+
+  if (options.json) {
+    try {
+      JSON.parse(text);
+      return text;
+    } catch (e) {
+      console.warn(
+        `⚠️ Response claimed JSON but parsing failed: ${text.substring(0, 200)}...`,
+      );
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return jsonMatch[0];
+      }
+      return text;
+    }
+  }
+
   return text;
 }
 
@@ -332,110 +359,227 @@ export async function transcribeChunk(chunkPath, lectureContext = "") {
   }
 
   console.log(
+    `✅ Transcription successful (${rawTranscript.length} characters)`,
+  );
+  console.log(
     "🦙 Refining transcript with Gemma 4 via Google AI Studio for SDG 4 notes.",
   );
-  return callGemma(
+
+  const cleanedTranscript = await callGemma(
     [
       {
         role: "system",
-        content: `You are Gemma 4, an expert teaching assistant for SDG 4: Quality Education.
-        Your task is to clean and enhance lecture transcripts for student learning.
-        
-        Guidelines:
-        - Preserve all important names, formulas, and definitions
-        - Fix grammar and improve readability
-        - Keep the original meaning and content
-        - Add natural section breaks
-        - Do not invent new facts or add external information
-        - Format the cleaned transcript for easy reading`,
+        content: `You are a transcript cleaner. Clean the lecture transcript below.
+        Return ONLY the cleaned transcript text. No explanations, no introductions, no meta-commentary.`,
       },
       {
         role: "user",
-        content: `Clean and enhance this lecture transcript for students:
+        content: `Clean this transcript for readability. Fix grammar, preserve all technical terms, names, and numbers. Return ONLY the cleaned text:
 
-        Lecture context: ${lectureContext || "not provided"}
-        Audio file: ${path.basename(chunkPath)}
-        
-        Raw transcript:
-        ${rawTranscript}
-        
-        Return the cleaned, well-formatted transcript.`,
+        ${rawTranscript}`,
       },
     ],
     { maxTokens: 2048 },
   );
+
+  // Return just the cleaned text, not the system prompt
+  return cleanedTranscript;
+}
+
+// Helper function to create notes directly from transcript
+function createSimpleNotesFromTranscript(transcript) {
+  console.log(
+    `📝 Creating simple notes from transcript (${transcript.length} characters)`,
+  );
+
+  // Remove any system prompt artifacts
+  let cleanTranscript = transcript;
+  const artifacts = [
+    "Expert Teaching Assistant",
+    "Clean and enhance",
+    "Preserve names",
+    "Fix grammar",
+    "Maintain original",
+    "You are Gemma",
+    "Your task is to clean",
+    "Guidelines:",
+  ];
+
+  artifacts.forEach((artifact) => {
+    cleanTranscript = cleanTranscript.replace(new RegExp(artifact, "gi"), "");
+  });
+
+  // Split into sentences
+  const sentences = cleanTranscript
+    .split(/[.!?]\s+/)
+    .filter((s) => s.trim().length > 15)
+    .map((s) => s.trim());
+
+  if (sentences.length === 0) {
+    return {
+      summary: "Lecture notes from the transcript.",
+      learningObjectives: [
+        "Review the lecture material",
+        "Practice applying the concepts",
+        "Prepare questions for clarification",
+      ],
+      headings: [
+        {
+          title: "Lecture Content",
+          keyPoints: ["Content from the lecture"],
+          examples: [],
+        },
+      ],
+      actionItems: ["Review and practice the material"],
+    };
+  }
+
+  // Create summary from first 2-3 sentences
+  const summary = sentences.slice(0, 3).join(". ") + ".";
+
+  // Group sentences into sections
+  const sectionSize = Math.max(3, Math.ceil(sentences.length / 3));
+  const headings = [];
+
+  for (let i = 0; i < sentences.length; i += sectionSize) {
+    const sectionSentences = sentences.slice(
+      i,
+      Math.min(i + sectionSize, sentences.length),
+    );
+    if (sectionSentences.length > 0) {
+      headings.push({
+        title: `Section ${Math.floor(i / sectionSize) + 1}`,
+        keyPoints: sectionSentences.slice(0, 5),
+        examples: [],
+      });
+    }
+  }
+
+  // If no headings were created, use all sentences as key points
+  if (headings.length === 0) {
+    headings.push({
+      title: "Key Points",
+      keyPoints: sentences.slice(0, 8),
+      examples: [],
+    });
+  }
+
+  return {
+    summary: summary || "Key concepts from the lecture.",
+    learningObjectives: [
+      "Understand the core concepts presented",
+      "Apply the knowledge to practical scenarios",
+      "Review and reinforce key takeaways",
+    ],
+    headings: headings,
+    actionItems: [
+      "Review the material for deeper understanding",
+      "Practice applying the concepts",
+      "Prepare questions for further clarification",
+    ],
+  };
 }
 
 export async function cleanAndStructureNotes(
   fullTranscript,
   lectureContext = "",
 ) {
-  const text = await callGemma(
-    [
-      {
-        role: "system",
-        content: `You are Gemma 4, an expert educational assistant for SDG 4: Quality Education.
-        
-        CRITICAL: Convert the transcript into a complete, self-contained set of study notes.
-        
-        Return ONLY valid JSON with this exact structure:
-        {
-          "summary": "A comprehensive 2-4 sentence overview",
-          "learningObjectives": ["Objective 1", "Objective 2", "Objective 3"],
-          "headings": [
-            { 
-              "title": "Section title", 
-              "keyPoints": ["Key point 1", "Key point 2"], 
-              "examples": ["Example 1", "Example 2"],
-              "definitions": [
-                {"term": "Term", "definition": "Definition"}
-              ]
-            }
-          ],
-          "keyTerms": [
-            {"term": "Term", "definition": "Definition"}
-          ],
-          "actionItems": ["Study task 1", "Study task 2"],
-          "transcriptPreview": "The most important excerpt"
-        }`,
-      },
-      {
-        role: "user",
-        content: `Convert this lecture transcript into comprehensive study notes:
-        
-        Lecture Context: ${lectureContext || "Not provided"}
-        
-        Transcript:
-        ${fullTranscript}
-        
-        Return ONLY valid JSON. No markdown, no extra text.`,
-      },
-    ],
-    { json: true, maxTokens: 4096 },
+  console.log(
+    `📝 Generating structured notes from transcript (${fullTranscript.length} characters)`,
   );
 
+  // Check if the transcript contains system prompt text
+  if (
+    fullTranscript.includes("Expert Teaching Assistant") ||
+    fullTranscript.includes("Clean and enhance") ||
+    fullTranscript.includes("Your task is to clean")
+  ) {
+    console.warn(
+      `⚠️ Transcript appears to contain system prompt, not actual transcript.`,
+    );
+    console.log(`📝 Attempting to extract actual content...`);
+
+    // Try to extract the actual transcript from the response
+    const lines = fullTranscript.split("\n");
+    const actualContent = lines
+      .filter(
+        (line) =>
+          !line.includes("Expert Teaching Assistant") &&
+          !line.includes("Clean and enhance") &&
+          !line.includes("Preserve names") &&
+          !line.includes("Fix grammar") &&
+          !line.includes("Maintain original") &&
+          !line.includes("You are Gemma") &&
+          !line.includes("Your task is to clean") &&
+          !line.includes("Guidelines:") &&
+          !line.includes("Return ONLY") &&
+          line.trim().length > 10,
+      )
+      .join("\n");
+
+    if (actualContent.length > 50) {
+      console.log(
+        `✅ Extracted actual content (${actualContent.length} characters)`,
+      );
+      fullTranscript = actualContent;
+    }
+  }
+
   try {
-    return parseJsonResponse(text);
-  } catch {
-    return {
-      summary: "Key concepts and learning points from the lecture.",
-      learningObjectives: [
-        "Understand the core concepts",
-        "Apply the knowledge to practical scenarios",
-        "Connect with prior learning",
-      ],
-      headings: [
+    const text = await callGemma(
+      [
         {
-          title: "Key Concepts",
-          keyPoints: ["Main ideas from the lecture"],
-          examples: ["Practical examples"],
-          definitions: [],
+          role: "system",
+          content: `You are Gemma 4, an expert educational assistant for SDG 4: Quality Education.
+          
+          CRITICAL: Convert the transcript into a complete, self-contained set of study notes.
+          
+          Return ONLY valid JSON with this exact structure. Do not add any text outside the JSON.
+          
+          {
+            "summary": "A comprehensive 2-4 sentence overview of the entire lecture",
+            "learningObjectives": ["Objective 1", "Objective 2", "Objective 3"],
+            "headings": [
+              { 
+                "title": "Section title", 
+                "keyPoints": ["Key point 1", "Key point 2"], 
+                "examples": ["Example 1", "Example 2"]
+              }
+            ],
+            "actionItems": ["Study task 1", "Study task 2"]
+          }`,
+        },
+        {
+          role: "user",
+          content: `Convert this lecture transcript into comprehensive study notes:
+          
+          ${fullTranscript}
+          
+          Return ONLY valid JSON. No markdown, no extra text, no explanations. Just the JSON object.`,
         },
       ],
-      keyTerms: [],
-      actionItems: ["Review and practice the material"],
-      transcriptPreview: fullTranscript.slice(0, 300),
-    };
+      { json: true, maxTokens: 4096 },
+    );
+
+    console.log(`📝 Raw response from Gemma (${text.length} characters)`);
+
+    try {
+      const parsed = parseJsonResponse(text);
+      console.log(`✅ Notes parsed successfully`);
+
+      if (!parsed.summary || !parsed.headings || parsed.headings.length === 0) {
+        console.warn(`⚠️ Parsed notes missing required fields, using fallback`);
+        return createSimpleNotesFromTranscript(fullTranscript);
+      }
+
+      return parsed;
+    } catch (parseError) {
+      console.error(`❌ JSON parsing failed: ${parseError.message}`);
+      return createSimpleNotesFromTranscript(fullTranscript);
+    }
+  } catch (error) {
+    console.error(`❌ cleanAndStructureNotes error: ${error.message}`);
+    return createSimpleNotesFromTranscript(fullTranscript);
   }
 }
 
