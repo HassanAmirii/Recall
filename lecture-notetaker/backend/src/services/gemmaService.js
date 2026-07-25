@@ -128,6 +128,25 @@ function parseJsonResponse(text) {
   return JSON.parse(cleaned);
 }
 
+function stripReasoningArtifacts(text) {
+  const reasoningMarkers = [
+    /^\s*\*?\s*(Role|Task|Constraints|Input text|User's persona request|Required response)\s*:/im,
+    /^\s*\[Chunk \d+\]/im,
+    /^\s*(Actually|Let's go with|I'll use|Refining|Final Polish|Refined Version)/im,
+    /^\s*\*?\s*(Your task is to|Guidelines:)/im,
+    /^\s*Expert Teaching Assistant/im,
+    /^\s*Clean and enhance/im,
+    /^\s*Preserve names/im,
+    /^\s*Fix grammar/im,
+    /^\s*Return ONLY/im,
+  ];
+  const lines = text.split("\n");
+  const cleanedLines = lines.filter(
+    (line) => !reasoningMarkers.some((pattern) => pattern.test(line)),
+  );
+  return cleanedLines.join("\n").trim();
+}
+
 async function callGroqGemma(messages, options = {}) {
   const { model } = getConfig();
   const groq = createGroqClient();
@@ -155,6 +174,7 @@ async function callTogetherGemma(messages, options = {}) {
   }
 
   console.log(`🛟 Using Together AI fallback: ${togetherModel}`);
+
   const response = await fetch(TOGETHER_CHAT_COMPLETIONS_URL, {
     method: "POST",
     headers: {
@@ -198,10 +218,20 @@ async function callGoogleGemma(messages, options = {}) {
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleApiKey}`;
 
-  const contents = messages.map((msg) => ({
-    role: msg.role === "assistant" ? "model" : "user",
-    parts: [{ text: msg.content }],
-  }));
+  // Extract system messages and filter contents
+  const systemMessages = messages.filter((msg) => msg.role === "system");
+  const systemInstruction =
+    systemMessages.length > 0
+      ? systemMessages.map((msg) => msg.content).join("\n\n")
+      : undefined;
+
+  // Only user and assistant messages go into contents
+  const contents = messages
+    .filter((msg) => msg.role !== "system")
+    .map((msg) => ({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    }));
 
   const requestBody = {
     contents: contents,
@@ -210,6 +240,13 @@ async function callGoogleGemma(messages, options = {}) {
       maxOutputTokens: options.maxTokens ?? 4096,
     },
   };
+
+  // Add system instruction as top-level field if present
+  if (systemInstruction) {
+    requestBody.systemInstruction = {
+      parts: [{ text: systemInstruction }],
+    };
+  }
 
   if (options.json) {
     requestBody.generationConfig.responseMimeType = "application/json";
@@ -229,7 +266,23 @@ async function callGoogleGemma(messages, options = {}) {
     );
   }
 
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  // Extract all parts and filter out thoughts
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  const finishReason = data.candidates?.[0]?.finishReason;
+
+  const text = parts
+    .filter((part) => !part.thought)
+    .map((part) => part.text || "")
+    .join("")
+    .trim();
+
+  // Check if we got an empty response due to token limit
+  if (!text && finishReason === "MAX_TOKENS") {
+    throw new Error(
+      `Response was cut off by token limit before producing an answer — increase maxTokens (current: ${options.maxTokens ?? 4096})`,
+    );
+  }
+
   if (!text) {
     console.error(
       `❌ Empty response from Google:`,
@@ -238,23 +291,26 @@ async function callGoogleGemma(messages, options = {}) {
     throw new Error("Google Gemma returned an empty response.");
   }
 
+  // Strip any reasoning artifacts that might leak through
+  const cleanedText = stripReasoningArtifacts(text);
+
   if (options.json) {
     try {
-      JSON.parse(text);
-      return text;
+      JSON.parse(cleanedText);
+      return cleanedText;
     } catch (e) {
       console.warn(
-        `⚠️ Response claimed JSON but parsing failed: ${text.substring(0, 200)}...`,
+        `⚠️ Response claimed JSON but parsing failed: ${cleanedText.substring(0, 200)}...`,
       );
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return jsonMatch[0];
       }
-      return text;
+      return cleanedText;
     }
   }
 
-  return text;
+  return cleanedText;
 }
 
 async function callGemma(messages, options = {}) {
@@ -326,7 +382,7 @@ export async function testGemmaConnection() {
         content: "Reply with: Gemma 4 via Google AI Studio is ready for SDG 4.",
       },
     ],
-    { maxTokens: 64 },
+    { maxTokens: 1024 }, // Increased from 64 to leave room for thinking tokens
   );
   console.log(`✅ Gemma 4 connection ready: ${response}`);
   return { ok: true, model, response };
@@ -379,10 +435,9 @@ export async function transcribeChunk(chunkPath, lectureContext = "") {
         ${rawTranscript}`,
       },
     ],
-    { maxTokens: 2048 },
+    { maxTokens: 2048 }, // Increased from default
   );
 
-  // Return just the cleaned text, not the system prompt
   return cleanedTranscript;
 }
 
@@ -558,7 +613,7 @@ export async function cleanAndStructureNotes(
           Return ONLY valid JSON. No markdown, no extra text, no explanations. Just the JSON object.`,
         },
       ],
-      { json: true, maxTokens: 4096 },
+      { json: true, maxTokens: 4096 }, // Keep 4096 for JSON output
     );
 
     console.log(`📝 Raw response from Gemma (${text.length} characters)`);
@@ -593,10 +648,11 @@ export async function answerQuestion(
     .map((message) => `${message.role}: ${message.content}`)
     .join("\n");
 
-  return callGemma([
-    {
-      role: "system",
-      content: `You are a world-class teacher assistant for SDG 4: Quality Education.
+  return callGemma(
+    [
+      {
+        role: "system",
+        content: `You are a world-class teacher assistant for SDG 4: Quality Education.
 
       CRITICAL: DO NOT describe what you're about to do. DO NOT explain your thinking process. DIRECTLY ANSWER the student's question.
 
@@ -609,10 +665,10 @@ export async function answerQuestion(
       Use simple, clear language. Bold important terms with **. Use bullet points with -.
 
       Never say "I will" or "I'm going to" - just answer directly.`,
-    },
-    {
-      role: "user",
-      content: `Based on these lecture notes, directly answer the student's question:
+      },
+      {
+        role: "user",
+        content: `Based on these lecture notes, directly answer the student's question:
 
       Lecture Notes:
       ${JSON.stringify(structuredNotes || {}, null, 2)}
@@ -623,8 +679,10 @@ export async function answerQuestion(
       Student's Question: ${question}
 
       DIRECTLY ANSWER. No planning, no meta-commentary. Just the answer with proper formatting.`,
-    },
-  ]);
+      },
+    ],
+    { maxTokens: 4096 }, // Increased to leave room for thinking tokens
+  );
 }
 
 if (process.env.NODE_ENV !== "test") {
